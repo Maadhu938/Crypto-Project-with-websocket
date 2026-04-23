@@ -84,6 +84,48 @@ def fetch_recent_prices(symbol, days=7):
         _price_cache[cache_key] = {"timestamp": now, "prices": prices}
         return prices
     except requests.exceptions.RequestException as e:
+        # If provider fails (including 429), reuse stale cache when available.
+        if cached and cached.get("prices"):
+            return cached["prices"]
+
+        # CoinLore fallback for symbols mapped to CoinLore IDs.
+        coinlore_id = _LIVE_COIN_IDS.get(symbol)
+        if coinlore_id:
+            try:
+                fallback_days = max(7, min(int(days), 365))
+                from_ts = int(now) - fallback_days * 86400
+                to_ts = int(now)
+                fallback_url = "https://api.coinlore.net/api/coin/history/"
+                fallback_params = {
+                    "id": coinlore_id,
+                    "start": from_ts,
+                    "end": to_ts
+                }
+                fallback_response = requests.get(fallback_url, params=fallback_params, timeout=10)
+                fallback_response.raise_for_status()
+                fallback_data = fallback_response.json()
+
+                entries = fallback_data.get("history") if isinstance(fallback_data, dict) else fallback_data
+                prices = []
+                if isinstance(entries, list):
+                    for row in entries:
+                        if not isinstance(row, dict):
+                            continue
+                        price = row.get("price")
+                        if price is None:
+                            price = row.get("priceUsd")
+                        if price is None:
+                            continue
+                        prices.append(float(price))
+
+                if prices:
+                    _price_cache[cache_key] = {"timestamp": now, "prices": prices}
+                    return prices
+            except requests.exceptions.RequestException:
+                pass
+            except (TypeError, ValueError):
+                pass
+
         raise Exception(f"Failed to fetch prices: {str(e)}")
 
 

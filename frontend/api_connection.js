@@ -72,12 +72,32 @@ function toggleTheme() {
 setTheme(currentTheme);
 
 const formatUsd = (value, digits = 2) =>
-    value === undefined || value === null
+    value === undefined || value === null || Number.isNaN(Number(value))
         ? "--"
-        : `$${Number(value).toLocaleString("en-US", {
-              minimumFractionDigits: digits,
-              maximumFractionDigits: digits
-          })}`;
+        : (() => {
+              const num = Number(value);
+              const abs = Math.abs(num);
+
+              if (abs > 0 && abs < 1e-8) {
+                  return `$${num.toExponential(4)}`;
+              }
+
+              let maxDigits = digits;
+              if (abs >= 1) {
+                  maxDigits = 2;
+              } else if (abs >= 0.01) {
+                  maxDigits = 4;
+              } else if (abs >= 0.0001) {
+                  maxDigits = 6;
+              } else {
+                  maxDigits = 10;
+              }
+
+              return `$${num.toLocaleString("en-US", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: maxDigits
+              })}`;
+          })();
 
 function hashSeed(value) {
     let hash = 0;
