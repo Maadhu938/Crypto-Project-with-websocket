@@ -291,59 +291,84 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
     
     const lastPrice = history[history.length - 1];
     const futureDays = 5;
-    const lstmFuture = Array.from({length: futureDays}, (_, i) => {
-        const t = (i + 1) / (futureDays + 1);
-        return lastPrice + (lstmPred - lastPrice) * t;
-    });
-    const xgbFuture = Array.from({length: futureDays}, (_, i) => {
-        const t = (i + 1) / (futureDays + 1);
-        return lastPrice + (xgbPred - lastPrice) * t;
-    });
-    
-    const labels = [...history.map((_, i) => `Day ${i + 1}`), ...Array(futureDays).fill(null).map((_, i) => `Day ${history.length + i + 1}`)];
+    const hasLstm = Number.isFinite(lstmPred);
+    const hasXgb = Number.isFinite(xgbPred);
+
+    const makeFuturePath = (target) =>
+        Array.from({ length: futureDays }, (_, i) => {
+            const t = (i + 1) / futureDays;
+            return lastPrice + (target - lastPrice) * t;
+        });
+
+    const lstmFuture = hasLstm ? makeFuturePath(lstmPred) : [];
+    const xgbFuture = hasXgb ? makeFuturePath(xgbPred) : [];
+
+    const labels = [
+        ...history.map((_, i) => `Day ${i + 1}`),
+        ...Array.from({ length: futureDays }, (_, i) => `+${i + 1}d`)
+    ];
+
+    const datasets = [
+        {
+            label: "Historical Price (30 Days)",
+            data: [...history, ...Array(futureDays).fill(null)],
+            borderColor: "#007bff",
+            backgroundColor: "rgba(0, 123, 255, 0.1)",
+            borderWidth: 2,
+            pointRadius: 2,
+            tension: 0.35,
+            fill: true
+        }
+    ];
+
+    if (hasLstm) {
+        datasets.push({
+            label: "LSTM Prediction",
+            data: [...Array(history.length - 1).fill(null), lastPrice, ...lstmFuture],
+            borderColor: "#28a745",
+            backgroundColor: "rgba(40, 167, 69, 0.1)",
+            borderWidth: 3,
+            pointRadius: 3,
+            pointBackgroundColor: "#28a745",
+            tension: 0.35,
+            fill: false
+        });
+    }
+
+    if (hasXgb) {
+        datasets.push({
+            label: "XGBoost Prediction",
+            data: [...Array(history.length - 1).fill(null), lastPrice, ...xgbFuture],
+            borderColor: "#ffc107",
+            backgroundColor: "rgba(255, 193, 7, 0.1)",
+            borderWidth: 3,
+            borderDash: [6, 4],
+            pointRadius: 3,
+            pointBackgroundColor: "#ffc107",
+            tension: 0.35,
+            fill: false
+        });
+    }
+
+    const allPlottedValues = [
+        ...history.filter(Number.isFinite),
+        ...lstmFuture.filter(Number.isFinite),
+        ...xgbFuture.filter(Number.isFinite)
+    ];
+    const minVal = Math.min(...allPlottedValues);
+    const maxVal = Math.max(...allPlottedValues);
+    const spread = Math.max(maxVal - minVal, Math.abs(maxVal) * 0.02, 1);
+    const yPadding = spread * 0.15;
     
     chartInstance = new Chart(chartCtx, {
         type: "line",
         data: {
             labels: labels,
-            datasets: [
-                {
-                    label: "Historical Price (30 Days)",
-                    data: [...history, ...Array(futureDays).fill(null)],
-                    borderColor: "#007bff",
-                    backgroundColor: "rgba(0, 123, 255, 0.1)",
-                    borderWidth: 2,
-                    pointRadius: 2,
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: "LSTM Prediction",
-                    data: [...Array(history.length - 1).fill(null), lastPrice, ...lstmFuture, lstmPred],
-                    borderColor: "#28a745",
-                    backgroundColor: "rgba(40, 167, 69, 0.1)",
-                    borderWidth: 3,
-                    pointRadius: 3,
-                    pointBackgroundColor: "#28a745",
-                    tension: 0.4,
-                    fill: false
-                },
-                {
-                    label: "XGBoost Prediction",
-                    data: [...Array(history.length - 1).fill(null), lastPrice, ...xgbFuture, xgbPred],
-                    borderColor: "#ffc107",
-                    backgroundColor: "rgba(255, 193, 7, 0.1)",
-                    borderWidth: 3,
-                    pointRadius: 3,
-                    pointBackgroundColor: "#ffc107",
-                    tension: 0.4,
-                    fill: false
-                }
-            ]
+            datasets
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 title: { display: true, text: `${symbol.toUpperCase()} Price Prediction Chart`, font: { size: 16, weight: 'bold' } },
                 legend: { display: true, position: 'top' },
@@ -359,13 +384,20 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
                 }
             },
             scales: {
-                x: { display: true, title: { display: true, text: 'Days' }, grid: { display: true, color: 'rgba(0,0,0,0.1)' } },
+                x: {
+                    display: true,
+                    title: { display: true, text: 'Days' },
+                    grid: { display: true, color: 'rgba(0,0,0,0.1)' },
+                    ticks: { autoSkip: true, maxTicksLimit: 10 }
+                },
                 y: {
                     display: true,
                     title: { display: true, text: 'Price (USD)' },
+                    min: minVal - yPadding,
+                    max: maxVal + yPadding,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                            return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
                         }
                     }
                 }
