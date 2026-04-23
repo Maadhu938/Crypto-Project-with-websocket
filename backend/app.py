@@ -12,6 +12,8 @@ import time
 import threading
 from datetime import datetime
 
+port = int(os.environ.get('PORT', 5000))
+
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -314,4 +316,4 @@ def handle_disconnect():
 
 
 if __name__ == "__main__":
-    socketio.run(app, port=5000, debug=True)
+    socketio.run(app, port=port, debug=True)
