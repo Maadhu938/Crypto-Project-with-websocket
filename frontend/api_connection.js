@@ -318,7 +318,7 @@ function renderLiveGrid(coins) {
 
 function initSocket() {
     if (typeof io === "undefined" || !socketStatus) return;
-    socket = io("http://localhost:5000", {
+    socket = io("https://api-cryptoapp.maadhuavati.in", {
         transports: ["websocket"],
         reconnectionAttempts: 5,
         reconnectionDelay: 2000
