@@ -308,6 +308,7 @@ body[data-theme="light"]{
     border:1px solid var(--border);
     border-radius:var(--radius-md);
     padding:16px;
+    min-height:250px;
 }
 
 .live-panel .live-meta{

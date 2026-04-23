@@ -14,7 +14,7 @@ const liveGrid = document.getElementById("live-grid");
 const socketStatus = document.getElementById("socket-status");
 const liveUpdated = document.getElementById("live-updated");
 const liveEmptyState = document.getElementById("live-empty");
-const themeToggle = document.getElementById("themeToggle");
+// // const themeToggle = document.getElementById("themeToggle");
 
 // State
 let currentPage = 1;
@@ -60,7 +60,7 @@ function setTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
     currentTheme = theme;
-    themeToggle.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
+    // themeToggle.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
 }
 
 function toggleTheme() {
