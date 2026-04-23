@@ -54,7 +54,8 @@ const formatUsd = (value, digits = 2) =>
 async function fetchAllCoins() {
     try {
         const res = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=250");
-        allCoins = await res.json();
+        const data = await res.json();
+        allCoins = data.data; // CoinLore returns {data: [...], info: {...}}
         // Map to similar format
         allCoins = allCoins.map(coin => ({
             id: coin.id,
@@ -107,7 +108,8 @@ async function loadTopCoins() {
     if (!coinSelect) return;
     try {
         const res = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=10");
-        const coins = await res.json();
+        const data = await res.json();
+        const coins = data.data; // CoinLore returns {data: [...], info: {...}}
         coinSelect.innerHTML = '<option value="">Select a coin...</option>';
         coins.forEach(coin => {
             const option = document.createElement("option");
