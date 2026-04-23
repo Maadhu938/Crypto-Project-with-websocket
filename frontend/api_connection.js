@@ -14,7 +14,7 @@ const liveGrid = document.getElementById("live-grid");
 const socketStatus = document.getElementById("socket-status");
 const liveUpdated = document.getElementById("live-updated");
 const liveEmptyState = document.getElementById("live-empty");
-// // const themeToggle = document.getElementById("themeToggle");
+const themeToggle = document.getElementById("themeToggle");
 
 // State
 let currentPage = 1;
@@ -39,7 +39,7 @@ const COIN_ID_ALIASES = {
     "binance-coin": "binancecoin"
 };
 let socket;
-let currentTheme = localStorage.getItem("theme") || "dark";
+let currentTheme = localStorage.getItem("theme") || "light";
 const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const API_BASE_URL = isLocalhost ? "http://localhost:5000" : "https://api-cryptoapp.maadhuavati.in";
 const SOCKET_BASE_URL = API_BASE_URL;
@@ -60,7 +60,7 @@ function setTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
     currentTheme = theme;
-    // themeToggle.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
+    themeToggle.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
 }
 
 function toggleTheme() {
