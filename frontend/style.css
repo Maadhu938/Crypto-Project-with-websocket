@@ -402,6 +402,12 @@ th{
     margin-right:8px;
 }
 
+.coin-name-cell{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
 .green{color:var(--success)}
 .red{color:var(--danger)}
 

@@ -168,16 +168,18 @@ def load_models(symbol):
         'xgb_metrics': os.path.join(model_dir, "xgb_metrics.pkl")
     }
     
-    # Try new structure
-    if os.path.exists(model_dir) and all(os.path.exists(paths[k]) for k in ['lstm_model', 'lstm_scaler', 'xgb_model', 'xgb_scaler']):
+    # Try new structure. LSTM artifacts are required, XGBoost artifacts are optional.
+    if os.path.exists(model_dir) and all(os.path.exists(paths[k]) for k in ['lstm_model', 'lstm_scaler']):
         if symbol in _model_cache:
             return _model_cache[symbol]
         try:
+            xgb_model = joblib.load(paths['xgb_model']) if os.path.exists(paths['xgb_model']) else None
+            xgb_scaler = joblib.load(paths['xgb_scaler']) if os.path.exists(paths['xgb_scaler']) else None
             models = (
                 load_model(paths['lstm_model']),
                 joblib.load(paths['lstm_scaler']),
-                joblib.load(paths['xgb_model']),
-                joblib.load(paths['xgb_scaler']),
+                xgb_model,
+                xgb_scaler,
                 joblib.load(paths['lstm_metrics']) if os.path.exists(paths['lstm_metrics']) else None,
                 joblib.load(paths['xgb_metrics']) if os.path.exists(paths['xgb_metrics']) else None
             )
@@ -247,15 +249,16 @@ def predict():
         lstm_pred_norm = lstm_model.predict(np.array(lstm_scaled).reshape(1, 60, 1), verbose=0)[0][0]
         lstm_prediction = lstm_scaler.inverse_transform([[lstm_pred_norm]])[0][0]
         
-        # XGBoost Prediction
-        xgb_input = prepare_xgb_input(prices)
-        xgb_scaled = xgb_scaler.transform(xgb_input)
-        xgb_prediction = xgb_model.predict(xgb_scaled)[0]
+        xgb_prediction = None
+        if xgb_model is not None and xgb_scaler is not None:
+            xgb_input = prepare_xgb_input(prices)
+            xgb_scaled = xgb_scaler.transform(xgb_input)
+            xgb_prediction = xgb_model.predict(xgb_scaled)[0]
         
         return jsonify({
             "symbol": symbol,
             "lstm_prediction": float(lstm_prediction),
-            "xgboost_prediction": float(xgb_prediction),
+            "xgboost_prediction": float(xgb_prediction) if xgb_prediction is not None else None,
             "history": prices[-30:] if len(prices) >= 30 else prices,
             "lstm_metrics": lstm_metrics if lstm_metrics else {},
             "xgb_metrics": xgb_metrics if xgb_metrics else {},

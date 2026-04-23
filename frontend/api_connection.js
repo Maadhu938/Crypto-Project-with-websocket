@@ -23,11 +23,37 @@ let allCoins = [];
 let chartInstance = null;
 let chartCtx = document.getElementById("prediction-chart")?.getContext("2d");
 const STREAM_COINS = ["bitcoin", "ethereum", "tether", "solana", "binancecoin", "ripple"];
+const SYMBOL_TO_COINGECKO_ID = {
+    btc: "bitcoin",
+    eth: "ethereum",
+    usdt: "tether",
+    sol: "solana",
+    bnb: "binancecoin",
+    xrp: "ripple",
+    usdc: "usd-coin",
+    trx: "tron",
+    steth: "staked-ether",
+    doge: "dogecoin"
+};
+const COIN_ID_ALIASES = {
+    "binance-coin": "binancecoin"
+};
 let socket;
 let currentTheme = localStorage.getItem("theme") || "dark";
 const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const API_BASE_URL = isLocalhost ? "http://localhost:5000" : "https://api-cryptoapp.maadhuavati.in";
 const SOCKET_BASE_URL = API_BASE_URL;
+
+function toBackendCoinId(coin) {
+    const nameId = String(coin?.nameid || "").toLowerCase().trim();
+    const symbol = String(coin?.symbol || "").toLowerCase().trim();
+
+    if (nameId) {
+        return COIN_ID_ALIASES[nameId] || nameId;
+    }
+
+    return SYMBOL_TO_COINGECKO_ID[symbol] || symbol;
+}
 
 // Theme functions
 function setTheme(theme) {
@@ -122,6 +148,7 @@ async function fetchAllCoins() {
         // Map to similar format
         allCoins = allCoins.map(coin => ({
             id: coin.id,
+            nameid: coin.nameid,
             symbol: coin.symbol.toLowerCase(),
             name: coin.name,
             current_price: parseFloat(coin.price_usd),
@@ -145,13 +172,23 @@ function renderTable() {
     pageCoins.forEach((coin, i) => {
         const changePos = coin.price_change_percentage_24h >= 0;
         const sparkline = createSparklineSVG(buildSparklineSeries(coin), changePos);
-        const iconSymbol = (coin.symbol || "").toLowerCase();
-        const iconUrl = `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${iconSymbol}.png`;
+        const iconByNameId = coin.nameid
+            ? `https://api.coinlore.net/img/25x25/${encodeURIComponent(coin.nameid)}.png`
+            : "";
+        const iconBySymbol = `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${encodeURIComponent((coin.symbol || "").toLowerCase())}.png`;
+        const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent((coin.symbol || coin.name || "?").toUpperCase())}&size=32&background=1f2937&color=ffffff&rounded=true&bold=true`;
+        const initialSrc = iconByNameId || iconBySymbol;
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${start + i + 1}</td>
-            <td>
-                <img class="crypto-img" src="${iconUrl}" alt="${coin.name} logo" loading="lazy" onerror="this.style.display='none'">
+            <td class="coin-name-cell">
+                <img
+                    class="crypto-img"
+                    src="${initialSrc}"
+                    alt="${coin.name} logo"
+                    loading="lazy"
+                    onerror="if(this.dataset.fallback==='1'){this.onerror=null;this.src='${fallbackAvatar}';}else{this.dataset.fallback='1';this.src='${iconBySymbol}';}"
+                >
                 ${coin.name}
             </td>
             <td>$${coin.current_price.toLocaleString()}</td>
@@ -181,7 +218,7 @@ async function loadTopCoins() {
         coinSelect.innerHTML = '<option value="">Select a coin...</option>';
         coins.forEach(coin => {
             const option = document.createElement("option");
-            option.value = coin.symbol.toLowerCase();
+            option.value = toBackendCoinId(coin);
             option.textContent = coin.name;
             coinSelect.appendChild(option);
         });
