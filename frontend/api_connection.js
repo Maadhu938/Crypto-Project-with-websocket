@@ -25,6 +25,9 @@ let chartCtx = document.getElementById("prediction-chart")?.getContext("2d");
 const STREAM_COINS = ["bitcoin", "ethereum", "tether", "solana", "binancecoin", "ripple"];
 let socket;
 let currentTheme = localStorage.getItem("theme") || "dark";
+const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const API_BASE_URL = isLocalhost ? "http://localhost:5000" : "https://api-cryptoapp.maadhuavati.in";
+const SOCKET_BASE_URL = API_BASE_URL;
 
 // Theme functions
 function setTheme(theme) {
@@ -49,6 +52,66 @@ const formatUsd = (value, digits = 2) =>
               minimumFractionDigits: digits,
               maximumFractionDigits: digits
           })}`;
+
+function hashSeed(value) {
+    let hash = 0;
+    const text = String(value || "coin");
+    for (let i = 0; i < text.length; i += 1) {
+        hash = (hash << 5) - hash + text.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
+
+function buildSparklineSeries(coin) {
+    const points = 12;
+    const price = Number(coin.current_price || 0);
+    const pct = Number(coin.price_change_percentage_24h || 0);
+    const seed = hashSeed(coin.id || coin.symbol || coin.name);
+    const drift = pct / 100;
+    const base = price > 0 ? price : 1;
+    const series = [];
+
+    for (let i = 0; i < points; i += 1) {
+        const t = i / (points - 1);
+        const wave = Math.sin((seed % 7 + 2) * t * Math.PI) * 0.0035;
+        const jitter = (((seed + i * 17) % 19) - 9) * 0.00045;
+        const value = base * (1 + drift * (t - 0.5) + wave + jitter);
+        series.push(Math.max(value, base * 0.85));
+    }
+
+    return series;
+}
+
+function createSparklineSVG(values, isPositive) {
+    if (!Array.isArray(values) || values.length < 2) {
+        return '<span class="sparkline-empty">--</span>';
+    }
+
+    const width = 120;
+    const height = 32;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = Math.max(max - min, 0.000001);
+
+    const points = values
+        .map((v, i) => {
+            const x = (i / (values.length - 1)) * (width - 2) + 1;
+            const y = height - 1 - ((v - min) / range) * (height - 4) - 1;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        })
+        .join(" ");
+
+    const stroke = isPositive ? "#22c55e" : "#ef4444";
+    const fill = isPositive ? "rgba(34,197,94,0.16)" : "rgba(239,68,68,0.16)";
+
+    return `
+        <svg class="sparkline-svg" viewBox="0 0 ${width} ${height}" width="120" height="32" aria-hidden="true" focusable="false">
+            <polyline points="${points} ${width - 1},${height - 1} 1,${height - 1}" fill="${fill}" stroke="none"></polyline>
+            <polyline points="${points}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        </svg>
+    `;
+}
 
 // Fetch all coins for table
 async function fetchAllCoins() {
@@ -81,12 +144,13 @@ function renderTable() {
     
     pageCoins.forEach((coin, i) => {
         const changePos = coin.price_change_percentage_24h >= 0;
-        const safeId = `spark-${coin.id.replace(/[^a-zA-Z0-9]/g, '')}-${start + i}`;
+        const sparkline = createSparklineSVG(buildSparklineSeries(coin), changePos);
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${start + i + 1}</td>
             <td>${coin.name}</td>
             <td>$${coin.current_price.toLocaleString()}</td>
+            <td class="sparkline-cell">${sparkline}</td>
             <td class="${changePos ? 'green' : 'red'}">${coin.price_change_percentage_24h?.toFixed(2)}%</td>
         `;
         tbody.appendChild(row);
@@ -133,7 +197,7 @@ async function getPrediction() {
     if (xgbVal) xgbVal.textContent = "Loading...";
 
     try {
-        const res = await fetch(`http://localhost:5000/predict?symbol=${coinSelect.value}`);
+        const res = await fetch(`${API_BASE_URL}/predict?symbol=${encodeURIComponent(coinSelect.value)}`);
         const data = await res.json();
         if (loader) loader.style.display = "none";
         
@@ -154,7 +218,7 @@ async function getPrediction() {
     } catch (err) {
         console.error("Prediction error:", err);
         if (loader) loader.style.display = "none";
-        showError("Backend not responding. Make sure backend is running on port 5000");
+        showError("Backend not responding. Check API server and CORS configuration.");
     }
 }
 
@@ -319,10 +383,11 @@ function renderLiveGrid(coins) {
 
 function initSocket() {
     if (typeof io === "undefined" || !socketStatus) return;
-    socket = io("https://api-cryptoapp.maadhuavati.in", {
-        transports: ["websocket"],
+    socket = io(SOCKET_BASE_URL, {
+        transports: ["websocket", "polling"],
         reconnectionAttempts: 5,
-        reconnectionDelay: 2000
+        reconnectionDelay: 2000,
+        timeout: 10000
     });
 
     socket.on("connect", () => {
@@ -332,6 +397,10 @@ function initSocket() {
 
     socket.on("disconnect", () => {
         setSocketStatus("Disconnected", "offline");
+    });
+
+    socket.on("connect_error", () => {
+        setSocketStatus("Reconnect failed", "offline");
     });
 
     socket.on("price_update", (payload) => {

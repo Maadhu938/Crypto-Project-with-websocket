@@ -405,6 +405,23 @@ th{
 .green{color:var(--success)}
 .red{color:var(--danger)}
 
+.sparkline-cell{
+    min-width:132px;
+    padding-top:10px;
+    padding-bottom:10px;
+}
+
+.sparkline-svg{
+    display:block;
+    width:120px;
+    height:32px;
+}
+
+.sparkline-empty{
+    color:var(--text-secondary);
+    font-size:12px;
+}
+
 #pagination{
     margin:22px 0 0;
     display:flex;
