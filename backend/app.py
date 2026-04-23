@@ -15,7 +15,7 @@ from datetime import datetime
 port = int(os.environ.get('PORT', 5000))
 
 app = Flask(__name__)
-CORS(app, origins=["https://cryptoapp.maadhuavati.in"])
+CORS(app, origins=["https://cryptoapp.maadhuavati.in", "https://crypto-five-gamma.vercel.app"])
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 _model_cache = {}
