@@ -21,6 +21,9 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 _model_cache = {}
 _price_cache = {}
 _PRICE_CACHE_TTL = 15 * 60  # 15 minutes
+_LIVE_CACHE_TTL = 30
+_LIVE_DEFAULT_INTERVAL = 10
+_LIVE_BACKOFF_MAX = 120
 
 _LIVE_COINS = [
     "bitcoin",
@@ -60,6 +63,8 @@ _LIVE_COIN_IDS = {
 }
 _live_thread = None
 _live_thread_lock = threading.Lock()
+_live_payload_cache = {"timestamp": 0, "payload": {"timestamp": 0, "coins": []}}
+_live_backoff_seconds = 0
 
 
 def fetch_recent_prices(symbol, days=7):
@@ -82,8 +87,39 @@ def fetch_recent_prices(symbol, days=7):
         raise Exception(f"Failed to fetch prices: {str(e)}")
 
 
-def fetch_simple_prices(symbols):
-    """Fetch current prices for a list of symbols from CoinLore."""
+def fetch_simple_prices_coingecko(symbols):
+    """Fetch current prices for a list of symbols from CoinGecko."""
+    ids = ",".join(symbols)
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {
+        "ids": ids,
+        "vs_currencies": "usd",
+        "include_24hr_change": "true"
+    }
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+    payload = []
+    timestamp = int(time.time())
+    for symbol in symbols:
+        entry = data.get(symbol)
+        if not isinstance(entry, dict):
+            continue
+        price = entry.get("usd")
+        change_24h = entry.get("usd_24h_change")
+        if price is None:
+            continue
+        payload.append({
+            "id": symbol,
+            "label": _LIVE_COIN_LABELS.get(symbol, symbol.title()),
+            "price": float(price),
+            "change24h": float(change_24h) if change_24h is not None else 0.0
+        })
+    return {"timestamp": timestamp, "coins": payload}
+
+
+def fetch_simple_prices_coinlore(symbols):
+    """Fallback provider for current prices when CoinGecko is rate-limited."""
     ids = ",".join([_LIVE_COIN_IDS.get(s, "90") for s in symbols])
     url = f"https://api.coinlore.net/api/ticker/?id={ids}"
     response = requests.get(url, timeout=10)
@@ -93,16 +129,32 @@ def fetch_simple_prices(symbols):
     timestamp = int(time.time())
     for symbol in symbols:
         coin_id = _LIVE_COIN_IDS.get(symbol)
-        entry = next((c for c in data if str(c["id"]) == coin_id), None)
+        entry = next((c for c in data if str(c.get("id")) == coin_id), None)
         if not entry:
             continue
         payload.append({
             "id": symbol,
             "label": _LIVE_COIN_LABELS.get(symbol, symbol.title()),
-            "price": float(entry.get("price_usd", 0)),
-            "change24h": float(entry.get("percent_change_24h", 0.0))
+            "price": float(entry.get("price_usd", 0) or 0),
+            "change24h": float(entry.get("percent_change_24h", 0.0) or 0.0)
         })
     return {"timestamp": timestamp, "coins": payload}
+
+
+def fetch_live_prices_with_fallback(symbols):
+    """Try CoinGecko first, then fallback to CoinLore for resilience."""
+    try:
+        return fetch_simple_prices_coingecko(symbols), "coingecko", None
+    except requests.exceptions.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        try:
+            fallback_payload = fetch_simple_prices_coinlore(symbols)
+            return fallback_payload, "coinlore", status
+        except requests.exceptions.RequestException:
+            raise exc
+    except requests.exceptions.RequestException:
+        fallback_payload = fetch_simple_prices_coinlore(symbols)
+        return fallback_payload, "coinlore", None
 
 def load_models(symbol):
     """Load LSTM and XGBoost models for a given symbol"""
@@ -274,17 +326,44 @@ def predict_with_history():
 
 def _live_price_worker():
     """Background task that streams live prices over WebSocket."""
+    global _live_backoff_seconds
     while True:
+        sleep_seconds = _LIVE_DEFAULT_INTERVAL
         try:
-            payload = fetch_simple_prices(_LIVE_COINS)
+            payload, provider, rate_status = fetch_live_prices_with_fallback(_LIVE_COINS)
             if payload["coins"]:
+                _live_payload_cache["timestamp"] = int(time.time())
+                _live_payload_cache["payload"] = payload
                 socketio.emit("price_update", payload)
+            if provider == "coingecko":
+                _live_backoff_seconds = 0
+            if rate_status == 429:
+                _live_backoff_seconds = min(
+                    _LIVE_BACKOFF_MAX,
+                    max(20, (_live_backoff_seconds * 2) if _live_backoff_seconds else 20)
+                )
+                sleep_seconds = _live_backoff_seconds
         except requests.exceptions.RequestException as exc:
-            socketio.emit("price_error", {"message": f"Live feed error: {exc}"})
+            now = int(time.time())
+            cache_age = now - int(_live_payload_cache["timestamp"])
+            if _live_payload_cache["payload"]["coins"] and cache_age <= _LIVE_CACHE_TTL:
+                cached_payload = {
+                    "timestamp": now,
+                    "coins": _live_payload_cache["payload"]["coins"]
+                }
+                socketio.emit("price_update", cached_payload)
+            else:
+                socketio.emit("price_error", {"message": f"Live feed error: {exc}"})
+            _live_backoff_seconds = min(
+                _LIVE_BACKOFF_MAX,
+                max(20, (_live_backoff_seconds * 2) if _live_backoff_seconds else 20)
+            )
+            sleep_seconds = _live_backoff_seconds
         except Exception as exc:  # pragma: no cover - defensive
             socketio.emit("price_error", {"message": f"Unexpected live feed error: {exc}"})
+            sleep_seconds = max(sleep_seconds, 15)
         finally:
-            socketio.sleep(10)
+            socketio.sleep(sleep_seconds)
 
 
 def _ensure_live_thread():
