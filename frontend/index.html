@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-Time Crypto Prediction Desk</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' ry='6' fill='%23020c1f'/%3E%3Ctext x='16' y='21' font-size='18' text-anchor='middle' fill='%23ffffff'%3EC%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <main class="app-shell">
+        <header class="hero">
+            <div class="theme-toggle">
+                <button id="themeToggle" class="toggle-btn">🌙 Dark</button>
+            </div>
+            <p class="eyebrow">AI + WebSocket Powered</p>
+            <h1 class="title">Real-Time Cryptocurrency Intelligence</h1>
+            <p class="subtitle">
+                Compare LSTM and XGBoost forecasts, monitor live prices, and explore market context in a single professional workspace.
+            </p>
+            <div class="hero-stats">
+                <div class="stat-card">
+                    <span>Model Stack</span>
+                    <strong>LSTM + XGBoost</strong>
+                </div>
+                <div class="stat-card">
+                    <span>Coverage</span>
+                    <strong>Top 10 Coins</strong>
+                </div>
+                <div class="stat-card">
+                    <span>Live Refresh</span>
+                    <strong>~10s</strong>
+                </div>
+            </div>
+        </header>
+
+        <section class="content-grid">
+            <div class="panel prediction-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Prediction Workspace</h2>
+                        <p>Pick a coin to generate side-by-side AI forecasts.</p>
+                    </div>
+                    <span class="badge">Dual-Model</span>
+                </div>
+                <div class="control-row">
+                    <label for="coinSelect">Select asset</label>
+                    <select id="coinSelect" class="dropdown">
+                        <option value="">Select a coin...</option>
+                    </select>
+                </div>
+                <div id="loader" class="inline-loader" style="display:none">Loading latest market data...</div>
+                <div class="prediction-cards-container">
+                    <div class="prediction-card-item">
+                        <p class="label">LSTM Prediction</p>
+                        <p id="lstm-val" class="value">--</p>
+                    </div>
+                    <div class="prediction-card-item">
+                        <p class="label">XGBoost Prediction</p>
+                        <p id="xgb-val" class="value">--</p>
+                    </div>
+                </div>
+                <p id="prediction-result" class="prediction-status"></p>
+
+                <div id="metrics-section" class="metrics-panel" style="display:none;">
+                    <div class="panel-subtitle">
+                        <h3>Model evaluation metrics</h3>
+                        <p>Latest backtest scores synced with training artifacts.</p>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-item"><div class="metric-label">LSTM MAE</div><div class="metric-value lstm" id="lstm-mae">--</div></div>
+                        <div class="metric-item"><div class="metric-label">LSTM RMSE</div><div class="metric-value lstm" id="lstm-rmse">--</div></div>
+                        <div class="metric-item"><div class="metric-label">LSTM MAPE</div><div class="metric-value lstm" id="lstm-mape">--</div></div>
+                        <div class="metric-item"><div class="metric-label">LSTM R²</div><div class="metric-value lstm" id="lstm-r2">--</div></div>
+                        <div class="metric-item"><div class="metric-label">XGBoost MAE</div><div class="metric-value xgb" id="xgb-mae">--</div></div>
+                        <div class="metric-item"><div class="metric-label">XGBoost RMSE</div><div class="metric-value xgb" id="xgb-rmse">--</div></div>
+                        <div class="metric-item"><div class="metric-label">XGBoost MAPE</div><div class="metric-value xgb" id="xgb-mape">--</div></div>
+                        <div class="metric-item"><div class="metric-label">XGBoost R²</div><div class="metric-value xgb" id="xgb-r2">--</div></div>
+                    </div>
+                </div>
+
+                <div id="chart-section" class="chart-container" style="display:none;">
+                    <canvas id="prediction-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="panel live-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Live Market Pulse</h2>
+                        <p>Streaming websocket feed refreshed ~10 seconds.</p>
+                    </div>
+                    <span class="status-pill" id="socket-status">Connecting...</span>
+                </div>
+                <div class="live-meta">
+                    <span>Last update: <strong id="live-updated">--</strong></span>
+                </div>
+                <div class="live-grid" id="live-grid"></div>
+                <div class="empty-state" id="live-empty">Waiting for live prices...</div>
+            </div>
+        </section>
+
+        <section class="panel table-panel">
+            <div class="panel-header">
+                <div>
+                    <h2>Market Watchlist</h2>
+                    <p>Paginated snapshot of the top 250 digital assets.</p>
+                </div>
+                <div class="badge light">Powered by CoinGecko</div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Price (USD)</th>
+                            <th>Sparkline</th>
+                            <th>24h Change</th>
+                        </tr>
+                    </thead>
+                    <tbody id="crypto-body"></tbody>
+                </table>
+            </div>
+            <div id="pagination">
+                <button id="prev-btn">Prev</button>
+                <span id="page-number">1</span>
+                <button id="next-btn">Next</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="api_connection.js"></script>
+</body>
+</html>
