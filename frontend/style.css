@@ -111,7 +111,7 @@ body[data-theme="light"]{
 }
 
 .stat-card{
-    background:rgba(15,23,42,0.8);
+    background:var(--bg-panel);
     border:1px solid var(--border);
     border-radius:var(--radius-md);
     padding:16px 24px;
@@ -203,7 +203,7 @@ body[data-theme="light"]{
     padding:14px 18px;
     border-radius:var(--radius-md);
     border:1px solid var(--border);
-    background:rgba(2,6,23,0.6);
+    background:var(--bg-panel);
     color:var(--text-primary);
     font-size:16px;
     outline:none;
@@ -232,7 +232,7 @@ body[data-theme="light"]{
     border:1px solid var(--border);
     border-radius:var(--radius-md);
     padding:18px;
-    background:rgba(15,23,42,0.6);
+    background:var(--bg-panel);
 }
 
 .prediction-card-item .label{
@@ -304,7 +304,7 @@ body[data-theme="light"]{
 
 .chart-container{
     margin-top:24px;
-    background:rgba(15,23,42,0.6);
+    background:var(--bg-panel);
     border:1px solid var(--border);
     border-radius:var(--radius-md);
     padding:16px;
@@ -337,7 +337,7 @@ body[data-theme="light"]{
     border:1px solid var(--border);
     border-radius:var(--radius-md);
     padding:16px;
-    background:rgba(15,23,42,0.7);
+    background:var(--bg-panel);
 }
 
 .live-card-head{
