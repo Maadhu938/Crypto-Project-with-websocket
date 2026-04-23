@@ -305,11 +305,19 @@ function updateMetrics(lstmMetrics, xgbMetrics) {
 // Display chart with smooth continuation
 function displayChart(history, lstmPred, xgbPred, symbol) {
     if (!chartSection || !chartCtx) return;
+
+    const safeHistory = Array.isArray(history)
+        ? history.map((v) => Number(v)).filter((v) => Number.isFinite(v))
+        : [];
+    if (safeHistory.length < 2) {
+        chartSection.style.display = "none";
+        return;
+    }
     
     chartSection.style.display = "block";
     if (chartInstance) chartInstance.destroy();
     
-    const lastPrice = history[history.length - 1];
+    const lastPrice = safeHistory[safeHistory.length - 1];
     const futureDays = 5;
     const hasLstm = Number.isFinite(lstmPred);
     const hasXgb = Number.isFinite(xgbPred);
@@ -324,14 +332,14 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
     const xgbFuture = hasXgb ? makeFuturePath(xgbPred) : [];
 
     const labels = [
-        ...history.map((_, i) => `Day ${i + 1}`),
+        ...safeHistory.map((_, i) => `Day ${i + 1}`),
         ...Array.from({ length: futureDays }, (_, i) => `+${i + 1}d`)
     ];
 
     const datasets = [
         {
             label: "Historical Price (30 Days)",
-            data: [...history, ...Array(futureDays).fill(null)],
+            data: [...safeHistory, ...Array(futureDays).fill(null)],
             borderColor: "#007bff",
             backgroundColor: "rgba(0, 123, 255, 0.1)",
             borderWidth: 2,
@@ -344,7 +352,7 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
     if (hasLstm) {
         datasets.push({
             label: "LSTM Prediction",
-            data: [...Array(history.length - 1).fill(null), lastPrice, ...lstmFuture],
+            data: [...Array(safeHistory.length - 1).fill(null), lastPrice, ...lstmFuture],
             borderColor: "#28a745",
             backgroundColor: "rgba(40, 167, 69, 0.1)",
             borderWidth: 3,
@@ -358,7 +366,7 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
     if (hasXgb) {
         datasets.push({
             label: "XGBoost Prediction",
-            data: [...Array(history.length - 1).fill(null), lastPrice, ...xgbFuture],
+            data: [...Array(safeHistory.length - 1).fill(null), lastPrice, ...xgbFuture],
             borderColor: "#ffc107",
             backgroundColor: "rgba(255, 193, 7, 0.1)",
             borderWidth: 3,
@@ -371,7 +379,7 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
     }
 
     const allPlottedValues = [
-        ...history.filter(Number.isFinite),
+        ...safeHistory,
         ...lstmFuture.filter(Number.isFinite),
         ...xgbFuture.filter(Number.isFinite)
     ];
@@ -388,7 +396,7 @@ function displayChart(history, lstmPred, xgbPred, symbol) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: true,
             plugins: {
                 title: { display: true, text: `${symbol.toUpperCase()} Price Prediction Chart`, font: { size: 16, weight: 'bold' } },
                 legend: { display: true, position: 'top' },
