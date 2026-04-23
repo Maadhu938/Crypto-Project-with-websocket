@@ -145,10 +145,15 @@ function renderTable() {
     pageCoins.forEach((coin, i) => {
         const changePos = coin.price_change_percentage_24h >= 0;
         const sparkline = createSparklineSVG(buildSparklineSeries(coin), changePos);
+        const iconSymbol = (coin.symbol || "").toLowerCase();
+        const iconUrl = `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${iconSymbol}.png`;
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${start + i + 1}</td>
-            <td>${coin.name}</td>
+            <td>
+                <img class="crypto-img" src="${iconUrl}" alt="${coin.name} logo" loading="lazy" onerror="this.style.display='none'">
+                ${coin.name}
+            </td>
             <td>$${coin.current_price.toLocaleString()}</td>
             <td class="sparkline-cell">${sparkline}</td>
             <td class="${changePos ? 'green' : 'red'}">${coin.price_change_percentage_24h?.toFixed(2)}%</td>
