@@ -61,7 +61,6 @@ async function fetchAllCoins() {
             id: coin.id,
             symbol: coin.symbol.toLowerCase(),
             name: coin.name,
-            image: `https://api.coinlore.net/img/${coin.id}.png`, // CoinLore img
             current_price: parseFloat(coin.price_usd),
             price_change_percentage_24h: parseFloat(coin.percent_change_24h),
             market_cap: parseFloat(coin.market_cap_usd),
@@ -86,7 +85,7 @@ function renderTable() {
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${start + i + 1}</td>
-            <td><img src="${coin.image}" class="crypto-img" onerror="this.src='https://via.placeholder.com/32?text=${coin.symbol.toUpperCase()}'"> ${coin.name}</td>
+            <td>${coin.name}</td>
             <td>$${coin.current_price.toLocaleString()}</td>
             <td class="${changePos ? 'green' : 'red'}">${coin.price_change_percentage_24h?.toFixed(2)}%</td>
         `;
